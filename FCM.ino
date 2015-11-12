@@ -20,20 +20,17 @@ char lineEndType = '\n';
 
 Data *data;
 
-// Reset Pin for OpenLog
-const int resetPin = 4;
-
 volatile uint8_t numDropped = 0;
 
 // Hertz Rate for Data Collection
-const int hertz = 5;
+const int hertz = 2;
 const int delayTime = 1000 / hertz;
 
 // Variables for Data Collection
 float batteryVoltage = 9;
 
 //Interrupt Pin
-const int interruptPin = 2;
+const int interruptPin = 3;
 volatile long lastTime = 0; 
 volatile long pulseWidth = 0;
 
@@ -44,7 +41,7 @@ Servo doorServo2;
 const int doorServo2Pin = 10;
 
 Servo releaseServo;
-const int releaseServoPin = 12;
+const int releaseServoPin = 11;
 
 //PWM min - 870 PWM max - 2100
 
@@ -53,6 +50,8 @@ const int PWM_MIN = 1250;
 
 const int ledPin = 13;
 byte ledState = 0;
+
+volatile bool dropped = false;
 
 void setup() {
   // Initiate Serial Port
@@ -139,6 +138,26 @@ void loop() {
     
     writeData();
   }
+  
+  noInterrupts();
+  
+  bool localDropped = dropped;
+  
+  int localPulseWidth = pulseWidth;
+  
+  int val = map(localPulseWidth, PWM_MIN, PWM_MAX, 0, 255);
+  val = constrain(val, 0, 255);
+  Serial.println(localPulseWidth);
+  
+  interrupts();
+  
+  if (dropped) {
+    int alt = data->getAltitude();
+    Serial.print("B,");
+    Serial.print(numDropped);
+    Serial.print(',');
+    Serial.println(alt); 
+  }
 }
 
 void writeData() {
@@ -147,7 +166,7 @@ void writeData() {
   Serial.print("A,");
   Serial.print("M-Fly");
   Serial.print(",");
-  Serial.print(millis()/1000);
+  Serial.print(millis()/1000.0);
   Serial.print(",");
   Serial.print(data->getAltitude());
   Serial.print(",");
@@ -169,7 +188,7 @@ void writeData() {
   Serial.print(",");
   Serial.print(data->getMagZ());
   Serial.print(",");
-  Serial.print("0.0");   //Serial.println(MPXV7002DP.GetAirSpeed());
+  Serial.print(random(10,314));   //Serial.println(MPXV7002DP.GetAirSpeed());
   Serial.print(",");
   Serial.print(batteryVoltage);
   Serial.print(",");
@@ -199,8 +218,6 @@ void updateDropAndDoorServos() {
   static int releaseWrite = 0;
   int newReleaseWrite = 0;
   
-  bool dropped = false;
-  
   if (val > 255 * 3 / 4) {
     newReleaseWrite = 180;
     if (numDropped < 1) {
@@ -213,14 +230,6 @@ void updateDropAndDoorServos() {
       numDropped = 2;
       dropped = true;
     }
-  }
-  
-  if (dropped) {
-    int alt = data->getAltitude();
-    Serial.print("B,");
-    Serial.print(numDropped);
-    Serial.print(',');
-    Serial.println(alt); 
   }
   
   if (releaseWrite != newReleaseWrite) {
