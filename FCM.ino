@@ -1,5 +1,7 @@
 //M-Fly Flight Control Software
 
+#include <XBee.h>
+
 #include <Adafruit_Sensor.h>
 
 #include <Adafruit_BMP085_U.h>
@@ -12,15 +14,16 @@
 #include <Servo.h>
 //#include "Pressure.h"
 
-unsigned long timeOn;
-Data *data;
+XBee xbee = XBee();
 
-// File for OpenLog
-const char filename[] = "mfly.csv";
-const char lineEndType = '\n';
+char lineEndType = '\n';
+
+Data *data;
 
 // Reset Pin for OpenLog
 const int resetPin = 4;
+
+volatile uint8_t numDropped = 0;
 
 // Hertz Rate for Data Collection
 const int hertz = 5;
@@ -32,13 +35,24 @@ float batteryVoltage = 9;
 //Interrupt Pin
 const int interruptPin = 2;
 volatile long lastTime = 0; 
-volatile long timeAtRise = 0;
+volatile long pulseWidth = 0;
 
-//Servo Definitions
-Servo dropServo;
-const int servoPin = 9;
-const int dropAngles[] = {0, 90};
+Servo doorServo1;
+const int doorServo1Pin = 9;
+
+Servo doorServo2;
+const int doorServo2Pin = 10;
+
+Servo releaseServo;
+const int releaseServoPin = 12;
+
 //PWM min - 870 PWM max - 2100
+
+const int PWM_MAX = 1960;
+const int PWM_MIN = 1250;
+
+const int ledPin = 13;
+byte ledState = 0;
 
 void setup() {
   // Initiate Serial Port
@@ -46,20 +60,17 @@ void setup() {
   
   data = new Data();
   data->update();
-  
-  // Setup Reset Pin and Rest OpenLog
-  pinMode(resetPin, OUTPUT);
-  
-  digitalWrite(resetPin, LOW);
-  delay(100);
-  digitalWrite(resetPin, HIGH);
 
- // Setup OpenLog
-  setupOpenLog();
-
- //Setup servos
- pinMode(servoPin, OUTPUT);
- dropServo.attach(servoPin);
+  doorServo1.attach(doorServo1Pin);
+  doorServo1.write(0);
+  
+  doorServo2.attach(doorServo2Pin);
+  doorServo2.write(0);
+  
+  releaseServo.attach(releaseServoPin);
+  releaseServo.write(0);
+  
+  pinMode(ledPin, OUTPUT);
 
   //attach interupts as the last task in setup
   pinMode(interruptPin, INPUT); //set interruptPin as an input
@@ -67,6 +78,9 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(interruptPin), rising, RISING); //execute interrupt when voltage drops
 }
 
+
+//TOOD -> REMOVE
+/*
 void setupOpenLog() {
     // Get into OpenLog Command Prompt Mode and create file
   waitForCharacter('<');
@@ -112,19 +126,28 @@ void setupOpenLog() {
   Serial.print("Voltage");
   Serial.print(lineEndType);
 }
+*/
 
-void loop() {  
-  writeDataToOpenLog();
+long lastLoopTime = 0;
+
+void loop() {
   
-  delay(delayTime);
+  if (millis() - lastLoopTime > delayTime) {
+    lastLoopTime = millis();
+    ledState = !ledState;
+    digitalWrite(ledPin, ledState);
+    
+    writeData();
+  }
 }
 
-void writeDataToOpenLog() {
+void writeData() {
   float batteryVoltage = readVcc() / 1000.0f;
   
+  Serial.print("A,");
   Serial.print("M-Fly");
   Serial.print(",");
-  Serial.print(timeOn/1000000.0);
+  Serial.print(millis()/1000);
   Serial.print(",");
   Serial.print(data->getAltitude());
   Serial.print(",");
@@ -149,7 +172,63 @@ void writeDataToOpenLog() {
   Serial.print("0.0");   //Serial.println(MPXV7002DP.GetAirSpeed());
   Serial.print(",");
   Serial.print(batteryVoltage);
-  Serial.print(lineEndType);
+  Serial.print(",");
+  Serial.print(numDropped);
+  Serial.println();
+}
+
+void updateDropAndDoorServos() {
+  int localPulseWidth = pulseWidth;
+  
+  int val = map(localPulseWidth, PWM_MIN, PWM_MAX, 0, 255);
+  val = constrain(val, 0, 255);
+  
+  static int doorWrite = 0;
+  int newDoorWrite = 0;
+  
+  if (val > 255 / 4) {
+    newDoorWrite = 180;
+  }
+  
+  if (doorWrite != newDoorWrite) {
+    doorWrite = newDoorWrite;
+    doorServo1.write(doorWrite);
+    doorServo2.write(doorWrite);
+  }
+  
+  static int releaseWrite = 0;
+  int newReleaseWrite = 0;
+  
+  bool dropped = false;
+  
+  if (val > 255 * 3 / 4) {
+    newReleaseWrite = 180;
+    if (numDropped < 1) {
+      numDropped = 1;
+      dropped = true;
+    }
+  } else if (val > 255 / 2) {
+    newReleaseWrite = 90;
+    if (numDropped < 2) {
+      numDropped = 2;
+      dropped = true;
+    }
+  }
+  
+  if (dropped) {
+    int alt = data->getAltitude();
+    Serial.print("B,");
+    Serial.print(numDropped);
+    Serial.print(',');
+    Serial.println(alt); 
+  }
+  
+  if (releaseWrite != newReleaseWrite) {
+    releaseWrite = newReleaseWrite;
+    releaseServo.write(releaseWrite);
+  }
+    
+  Serial.println(val);
 }
 
 // Waits until the serial port reads a given character
@@ -176,11 +255,6 @@ long readVcc() {
 }
 
 void rising(){
-  
-  if(micros() - lastTime > 250){ 
-    timeAtRise = micros();
-  }
-
   lastTime = micros();
 
   detachInterrupt(digitalPinToInterrupt(interruptPin));
@@ -188,19 +262,10 @@ void rising(){
 }
 
 void drop(){ //writes the drop agle to the servo and logs current flight data at that instant
-
-  if(micros() - lastTime > 250){ //ensure against multiple executions of the drop function for one voltage change
-    int angle = map(micros()-lastTime,870,2100,0,180);
-    dropServo.write(angle);
-  }
-
-  lastTime = micros();
-
+  pulseWidth = micros() - lastTime;
+  
   detachInterrupt(digitalPinToInterrupt(interruptPin));
   attachInterrupt(digitalPinToInterrupt(interruptPin), rising, RISING);
+  
+  lastTime = constrain(pulseWidth, PWM_MIN, PWM_MAX);
 }
-
-void retract(){//for possible use later, writes to the servo the retracted angle
-  dropServo.write(dropAngles[0]);
-}
-
