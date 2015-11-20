@@ -4,8 +4,6 @@
 // receiver frequently drops, causing servos to jitter
 // uncontrollably
 
-#include <XBee.h>
-
 #include <Adafruit_Sensor.h>
 
 #include <Adafruit_BMP085_U.h>
@@ -17,10 +15,6 @@
 #include <Wire.h>
 #include <Servo.h>
 //#include "Pressure.h"
-
-XBee xbee = XBee();
-
-char lineEndType = '\n';
 
 Data *data;
 
@@ -159,16 +153,19 @@ void writeData() {
 }
 
 void updateDropAndDoorServos(int localPulseWidth) {
-  // Map value from receiver to usable values
-  int val = map(localPulseWidth, PWM_MIN, PWM_MAX, 0, 255);
-  
   const int MAX = 255;
+
+  // Map value from receiver to usable values
+  int val = map(localPulseWidth, PWM_MIN, PWM_MAX, 0, MAX);
   
   val = constrain(val, 0, MAX);
   
+  // TODO: Possibly change integer division to floating division
+  // based on testing parameters
+  
   static int doorWrite = 0;
   int newDoorWrite = 0;
-  
+   
   // Open door if val > MAX / 4
   if (val > MAX / 4) {
     newDoorWrite = 180;
@@ -198,7 +195,7 @@ void updateDropAndDoorServos(int localPulseWidth) {
       numDropped = 1;
       dropped = true;
     }
-  } else if numDropped >= 2 && val > MAX / 3) {
+  } else if (numDropped >= 2 && val > MAX / 3) {
     ++numDropped;
     dropped = true;
   }
