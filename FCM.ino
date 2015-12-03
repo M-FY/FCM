@@ -4,6 +4,9 @@
 // receiver frequently drops, causing servos to jitter
 // uncontrollably
 
+#include <XBee.h>
+#include <stdlib.h>
+
 #include <Adafruit_Sensor.h>
 
 #include <Adafruit_BMP085_U.h>
@@ -53,9 +56,15 @@ byte ledState = 0;
 
 bool dropped = false;
 
-void setup() {
+// XBee Setup
+
+XBee xbee;
+XBeeAddress64 broadcast = XBeeAddress64(0x00000000, 0x0000ffff);
+
+void setup() {  
   // Initiate Serial Port
   Serial.begin(9600);
+  xbee.begin(Serial);
   
   // Create Data class instance
   data = new Data();
@@ -83,6 +92,11 @@ void setup() {
 long lastLoopTime = 0;
 
 void loop() {
+  while (Serial.available())
+    Serial.print((char) Serial.read());
+  
+  data->update();
+  
   // Blink LED and Write Data to Serial regularly
   if (millis() - lastLoopTime > delayTime) {
     lastLoopTime = millis();
@@ -107,30 +121,55 @@ void loop() {
   
   if (dropped) {
     int alt = data->getAltitude();
-    Serial.print("B,");
-    Serial.print(numDropped);
-    Serial.print(',');
-    Serial.println(alt); 
+    
+    static char bBuffer[32];
+    
+    sprintf(bBuffer, "B,%d,%d,\n", numDropped, alt);
+    
+    ZBTxRequest zbtx = ZBTxRequest(broadcast, (uint8_t *) bBuffer, strlen(bBuffer));
+    xbee.send(zbtx);
+    
     dropped = false;
   }
 }
 
 void writeData() {
+  static char csvBuffer[64];
+  
   // Write telemetry to serial
   float batteryVoltage = readVcc() / 1000.0f;
   
+  float time = millis() / 1000.0f;
+  
+  char timeBuffer[20];
+  char altBuffer[16];
+  char gXBuffer[16];
+  char gYBuffer[16];
+  char gZBuffer[16];
+  char battBuffer[16];
+  
+  sprintf(csvBuffer, "A,M-Fly,%s,%s,%s,%s,%s,%d,%s,%d,\n",
+          dtostrf(time, 2, 2, timeBuffer),
+          dtostrf(data->getAltitude(), 2, 2, altBuffer),
+          dtostrf(data->getGyroX(), 2, 2, gXBuffer),
+          dtostrf(data->getGyroY(), 2, 2, gYBuffer),
+          dtostrf(data->getGyroZ(), 2, 2, gZBuffer),
+          random(10,40), // Airspeed
+          dtostrf(batteryVoltage, 2, 2, battBuffer),
+          numDropped);
+  
+  //Serial.print(csvBuffer);
+  
+  ZBTxRequest zbtx = ZBTxRequest(broadcast, (uint8_t *) csvBuffer, strlen(csvBuffer));
+  xbee.send(zbtx);
+  
+  /*
   Serial.print("A,");
   Serial.print("M-Fly");
   Serial.print(",");
-  Serial.print(millis()/1000.0);
+  Serial.print(sprintf("%0.1f",millis()/1000.0));
   Serial.print(",");
-  Serial.print(data->getAltitude());
-  Serial.print(",");
-  Serial.print(data->getAccelX());
-  Serial.print(",");
-  Serial.print(data->getAccelY());
-  Serial.print(",");
-  Serial.print(data->getAccelZ());
+  Serial.print(sprintf("%0.2f",data->getAltitude()));
   Serial.print(",");
   Serial.print(data->getGyroX());
   Serial.print(",");
@@ -138,18 +177,13 @@ void writeData() {
   Serial.print(",");
   Serial.print(data->getGyroZ());
   Serial.print(",");
-  Serial.print(data->getMagX());
-  Serial.print(",");
-  Serial.print(data->getMagY());
-  Serial.print(",");
-  Serial.print(data->getMagZ());
-  Serial.print(",");
   Serial.print(random(10,314));   //Serial.println(MPXV7002DP.GetAirSpeed());
   Serial.print(",");
   Serial.print(batteryVoltage);
   Serial.print(",");
   Serial.print(numDropped);
   Serial.println();
+  */
 }
 
 void updateDropAndDoorServos(int localPulseWidth) {
