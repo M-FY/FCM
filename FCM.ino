@@ -124,8 +124,16 @@ void loop() {
     
     static char bBuffer[32];
     
-    sprintf(bBuffer, "B,%d,%d,\n", numDropped, alt);
+    String bMessage = "B,";
+    bMessage += millis() / 1000.0f;
+    bMessage += ',';
+    bMessage += numDropped;
+    bMessage += ',';
+    bMessage += alt;
+    bMessage += ',';
     
+    bMessage.toCharArray(bBuffer, bMessage.length());
+        
     ZBTxRequest zbtx = ZBTxRequest(broadcast, (uint8_t *) bBuffer, strlen(bBuffer));
     xbee.send(zbtx);
     
@@ -141,49 +149,28 @@ void writeData() {
   
   float time = millis() / 1000.0f;
   
-  char timeBuffer[20];
-  char altBuffer[16];
-  char gXBuffer[16];
-  char gYBuffer[16];
-  char gZBuffer[16];
-  char battBuffer[16];
+  String message = "A,M-Fly,";
+  message += time;
+  message += ',';
+  message += data->getAltitude();
+  message += ',';
+  message += data->getGyroX();
+  message += ',';
+  message += data->getGyroY();
+  message += ',';
+  message += data->getGyroZ();
+  message += ',';
+  message += random(10,40);
+  message += ',';
+  message += batteryVoltage;
+  message += ',';
+  message += numDropped;
+  message += ',';
   
-  sprintf(csvBuffer, "A,M-Fly,%s,%s,%s,%s,%s,%d,%s,%d,\n",
-          dtostrf(time, 2, 2, timeBuffer),
-          dtostrf(data->getAltitude(), 2, 2, altBuffer),
-          dtostrf(data->getGyroX(), 2, 2, gXBuffer),
-          dtostrf(data->getGyroY(), 2, 2, gYBuffer),
-          dtostrf(data->getGyroZ(), 2, 2, gZBuffer),
-          random(10,40), // Airspeed
-          dtostrf(batteryVoltage, 2, 2, battBuffer),
-          numDropped);
-  
-  //Serial.print(csvBuffer);
+  message.toCharArray(csvBuffer, message.length());
   
   ZBTxRequest zbtx = ZBTxRequest(broadcast, (uint8_t *) csvBuffer, strlen(csvBuffer));
   xbee.send(zbtx);
-  
-  /*
-  Serial.print("A,");
-  Serial.print("M-Fly");
-  Serial.print(",");
-  Serial.print(sprintf("%0.1f",millis()/1000.0));
-  Serial.print(",");
-  Serial.print(sprintf("%0.2f",data->getAltitude()));
-  Serial.print(",");
-  Serial.print(data->getGyroX());
-  Serial.print(",");
-  Serial.print(data->getGyroY());
-  Serial.print(",");
-  Serial.print(data->getGyroZ());
-  Serial.print(",");
-  Serial.print(random(10,314));   //Serial.println(MPXV7002DP.GetAirSpeed());
-  Serial.print(",");
-  Serial.print(batteryVoltage);
-  Serial.print(",");
-  Serial.print(numDropped);
-  Serial.println();
-  */
 }
 
 void updateDropAndDoorServos(int localPulseWidth) {
