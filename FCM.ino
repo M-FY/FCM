@@ -92,9 +92,6 @@ void setup() {
 long lastLoopTime = 0;
 
 void loop() {
-  while (Serial.available())
-    Serial.print((char) Serial.read());
-  
   data->update();
   
   // Blink LED and Write Data to Serial regularly
