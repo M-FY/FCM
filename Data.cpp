@@ -7,7 +7,11 @@ Function Comments written by Daniel
 #include "Data.h"
 
 
-Data::Data() {
+Data::Data() : accel(30301), mag(30302), gyro(20) {
+	accel.begin();
+  mag.begin();
+  gyro.begin();
+	
 	pressure.begin();
 
 	setBaseline();

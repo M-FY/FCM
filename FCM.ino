@@ -16,8 +16,6 @@
 
 #include "Data.h"
 #include <Wire.h>
-#include <Servo.h>
-//#include "Pressure.h"
 
 Data *data;
 
@@ -163,6 +161,11 @@ void writeData() {
   message += ',';
   message += numDropped;
   message += ',';
+  message += data->getAccelX();
+  message += ',';
+  message += data->getAccelY();
+  message += ',';
+  message += data->getAccelZ();
   
   message.toCharArray(csvBuffer, message.length());
   
