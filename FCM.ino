@@ -17,12 +17,14 @@
 #include "Data.h"
 #include <Wire.h>
 
+#include <Servo.h>
+
 Data *data;
 
 volatile uint8_t numDropped = 0;
 
 // Hertz Rate for Data Collection
-const int hertz = 2;
+const int hertz = 10;
 const int delayTime = 1000 / hertz;
 
 const long debounceTime = 20000;
@@ -35,14 +37,14 @@ const int interruptPin = 3;
 volatile long lastTime = 0; 
 volatile long pulseWidth = 0;
 
-Servo doorServo1;
-const int doorServo1Pin = 9;
+Servo doorServo;
+const int doorServoPin = 9;
 
-Servo doorServo2;
-const int doorServo2Pin = 10;
+Servo releaseServo1;
+const int releaseServo1Pin = 10;
 
-Servo releaseServo;
-const int releaseServoPin = 11;
+Servo releaseServo2;
+const int releaseServo2Pin = 11;
 
 //PWM min - 870 PWM max - 2100
 
@@ -70,14 +72,14 @@ void setup() {
 
   // Initiate Servos
 
-  doorServo1.attach(doorServo1Pin);
-  doorServo1.write(0);
+  doorServo.attach(doorServoPin);
+  doorServo.write(0);
   
-  doorServo2.attach(doorServo2Pin);
-  doorServo2.write(0);
+  releaseServo1.attach(releaseServo1Pin);
+  releaseServo1.write(0);
   
-  releaseServo.attach(releaseServoPin);
-  releaseServo.write(0);
+  releaseServo2.attach(releaseServo2Pin);
+  releaseServo2.write(0);
   
   pinMode(ledPin, OUTPUT);
 
@@ -195,8 +197,7 @@ void updateDropAndDoorServos(int localPulseWidth) {
   // Write to door servos
   if (doorWrite != newDoorWrite) {
     doorWrite = newDoorWrite;
-    doorServo1.write(doorWrite);
-    doorServo2.write(doorWrite);
+    doorServo.write(doorWrite);
   }
   
   // hold values to write to servo
@@ -224,7 +225,8 @@ void updateDropAndDoorServos(int localPulseWidth) {
   // Only write to servo if necessary to avoid jitter
   if (releaseWrite != newReleaseWrite) {
     releaseWrite = newReleaseWrite;
-    releaseServo.write(releaseWrite);
+    releaseServo1.write(releaseWrite);
+    releaseServo2.write(releaseWrite);
   }
 }
 
