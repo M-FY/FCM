@@ -41,10 +41,10 @@ Servo doorServo;
 const int doorServoPin = 9;
 
 Servo releaseServo1;
-const int releaseServo1Pin = 10;
+const int releaseServo1Pin = 11;
 
 Servo releaseServo2;
-const int releaseServo2Pin = 11;
+const int releaseServo2Pin = 10;
 
 //PWM min - 870 PWM max - 2100
 
@@ -201,32 +201,41 @@ void updateDropAndDoorServos(int localPulseWidth) {
   }
   
   // hold values to write to servo
-  static int releaseWrite = 0;
-  int newReleaseWrite = 0;
+  static int releaseWrite1 = 0;
+  int newReleaseWrite1 = 15;
+
+  static int releaseWrite2 = 0;
+  int newReleaseWrite2 = 15;
   
   // Drop payloads as specified
   if (val > MAX * 3 / 4) {
-    newReleaseWrite = 180;
-    if (numDropped < 2) {
-      numDropped = 2;
-      dropped = true;
-    }
-  } else if (val > MAX / 3) {
-    newReleaseWrite = 90;
+    newReleaseWrite1 = 160;
+    newReleaseWrite2 = 180;
+    
     if (numDropped < 1) {
       numDropped = 1;
       dropped = true;
     }
-  } else if (numDropped >= 2 && val > MAX / 3) {
-    ++numDropped;
-    dropped = true;
+    
+  } else if (val > MAX / 3) {
+    newReleaseWrite1 = 110;
+    newReleaseWrite2 = 110;
+    
+    if (numDropped < 2) {
+      ++numDropped;
+      dropped = true;
+    }
   }
   
   // Only write to servo if necessary to avoid jitter
-  if (releaseWrite != newReleaseWrite) {
-    releaseWrite = newReleaseWrite;
-    releaseServo1.write(releaseWrite);
-    releaseServo2.write(releaseWrite);
+  if (releaseWrite1 != newReleaseWrite1) {
+    releaseWrite1 = newReleaseWrite1;
+    releaseServo1.write(releaseWrite1);
+  }
+
+  if (releaseWrite2 != newReleaseWrite2) {
+    releaseWrite2 = newReleaseWrite2;
+    releaseServo2.write(180 - releaseWrite2);
   }
 }
 
