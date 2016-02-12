@@ -4,6 +4,8 @@
 // receiver frequently drops, causing servos to jitter
 // uncontrollably
 
+// NOTE: Altitude Measurement in Meters
+
 #include <XBee.h>
 #include <stdlib.h>
 
@@ -24,7 +26,7 @@ Data *data;
 volatile uint8_t numDropped = 0;
 
 // Hertz Rate for Data Collection
-const int hertz = 10;
+const int hertz = 2;
 const int delayTime = 1000 / hertz;
 
 const long debounceTime = 20000;
