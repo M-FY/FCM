@@ -26,7 +26,7 @@ Data *data;
 volatile uint8_t numDropped = 0;
 
 // Hertz Rate for Data Collection
-const int hertz = 2;
+const int hertz = 5;
 const int delayTime = 1000 / hertz;
 
 const long debounceTime = 20000;
@@ -58,6 +58,9 @@ byte ledState = 0;
 
 bool dropped = false;
 
+const int DOOR_SERVO_START = 75;
+const int B_MSG_REPEAT_ATTEMPTS = 0;
+
 // XBee Setup
 
 XBee xbee;
@@ -75,7 +78,7 @@ void setup() {
   // Initiate Servos
 
   doorServo.attach(doorServoPin);
-  doorServo.write(0);
+  doorServo.write(DOOR_SERVO_START);
   
   releaseServo1.attach(releaseServo1Pin);
   releaseServo1.write(0);
@@ -117,8 +120,10 @@ void loop() {
   // readings from the receiver  
   if (millis() > (long)1000)
     updateDropAndDoorServos(localWidth);
+
+  static int drop_repeat = 0;
   
-  if (dropped) {
+  if (dropped || drop_repeat > 0) {
     int alt = data->getAltitude();
     
     static char bBuffer[32];
@@ -137,6 +142,10 @@ void loop() {
     xbee.send(zbtx);
     
     dropped = false;
+
+    // Reset Drop Repeat to ensure that the message gets repeated as much as it needs to.
+    if (drop_repeat > 0) --drop_repeat;
+    else drop_repeat = B_MSG_REPEAT_ATTEMPTS;
   }
 }
 
@@ -188,8 +197,8 @@ void updateDropAndDoorServos(int localPulseWidth) {
   // TODO: Possibly change integer division to floating division
   // based on testing parameters
   
-  static int doorWrite = 0;
-  int newDoorWrite = 0;
+  static int doorWrite = DOOR_SERVO_START;
+  int newDoorWrite = DOOR_SERVO_START;
    
   // Open door if val > MAX / 4
   if (val > MAX / 4) {
@@ -232,12 +241,12 @@ void updateDropAndDoorServos(int localPulseWidth) {
   // Only write to servo if necessary to avoid jitter
   if (releaseWrite1 != newReleaseWrite1) {
     releaseWrite1 = newReleaseWrite1;
-    releaseServo1.write(releaseWrite1);
+    releaseServo1.write(180 - releaseWrite1);
   }
 
   if (releaseWrite2 != newReleaseWrite2) {
     releaseWrite2 = newReleaseWrite2;
-    releaseServo2.write(180 - releaseWrite2);
+    releaseServo2.write(releaseWrite2);
   }
 }
 
