@@ -122,9 +122,12 @@ void loop() {
     updateDropAndDoorServos(localWidth);
 
   static int drop_repeat = 0;
+  static int drop_alt = 0;
   
   if (dropped || drop_repeat > 0) {
-    int alt = data->getAltitude();
+
+    if (drop_repeat == 0)
+      drop_alt = data->getAltitude();
     
     static char bBuffer[32];
     
@@ -133,7 +136,7 @@ void loop() {
     bMessage += ',';
     bMessage += numDropped;
     bMessage += ',';
-    bMessage += alt;
+    bMessage += drop_alt;
     bMessage += ',';
     
     bMessage.toCharArray(bBuffer, bMessage.length());
