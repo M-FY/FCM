@@ -26,7 +26,7 @@ Data *data;
 volatile uint8_t numDropped = 0;
 
 // Hertz Rate for Data Collection
-const int hertz = 5;
+const int hertz = 2;
 const int delayTime = 1000 / hertz;
 
 const long debounceTime = 20000;
@@ -59,7 +59,7 @@ byte ledState = 0;
 bool dropped = false;
 
 const int DOOR_SERVO_START = 75;
-const int B_MSG_REPEAT_ATTEMPTS = 0;
+const int B_MSG_REPEAT_ATTEMPTS = 10;
 
 // XBee Setup
 
@@ -99,15 +99,6 @@ long lastLoopTime = 0;
 void loop() {
   data->update();
   
-  // Blink LED and Write Data to Serial regularly
-  if (millis() - lastLoopTime > delayTime) {
-    lastLoopTime = millis();
-    ledState = !ledState;
-    digitalWrite(ledPin, ledState);
-    
-    writeData();
-  }
-  
   // Disable interrupts to get volatile parameters
   noInterrupts();
   
@@ -121,16 +112,29 @@ void loop() {
   if (millis() > (long)1000)
     updateDropAndDoorServos(localWidth);
 
+  // Blink LED and Write Data to Serial regularly
+  if (millis() - lastLoopTime > delayTime) {
+    lastLoopTime = millis();
+    ledState = !ledState;
+    digitalWrite(ledPin, ledState);
+    
+    if (dropped) writeDataB();
+    else writeData();
+  }
+}
+
+void writeDataB() {
   static int drop_repeat = 0;
   static int drop_alt = 0;
+  static int num_dropped_old = 0;
+  static char bBuffer[32];
   
-  if (dropped || drop_repeat > 0) {
+  if (drop_repeat == 0 || num_dropped_old != numDropped) {
+    drop_alt = data->getAltitude();
+    drop_repeat = B_MSG_REPEAT_ATTEMPTS;
 
-    if (drop_repeat == 0)
-      drop_alt = data->getAltitude();
-    
-    static char bBuffer[32];
-    
+    num_dropped_old = numDropped;
+
     String bMessage = "B,";
     bMessage += millis() / 1000.0f;
     bMessage += ',';
@@ -140,15 +144,16 @@ void loop() {
     bMessage += ',';
     
     bMessage.toCharArray(bBuffer, bMessage.length());
-        
-    ZBTxRequest zbtx = ZBTxRequest(broadcast, (uint8_t *) bBuffer, strlen(bBuffer));
-    xbee.send(zbtx);
-    
-    dropped = false;
+  }
+  
+  ZBTxRequest zbtx = ZBTxRequest(broadcast, (uint8_t *) bBuffer, strlen(bBuffer));
+  xbee.send(zbtx);
 
-    // Reset Drop Repeat to ensure that the message gets repeated as much as it needs to.
-    if (drop_repeat > 0) --drop_repeat;
-    else drop_repeat = B_MSG_REPEAT_ATTEMPTS;
+  // Reset Drop Repeat to ensure that the message gets repeated as much as it needs to.
+  if (drop_repeat > 0) {
+    --drop_repeat;
+
+    if (drop_repeat == 0) dropped = false;
   }
 }
 
@@ -194,7 +199,6 @@ void updateDropAndDoorServos(int localPulseWidth) {
 
   // Map value from receiver to usable values
   int val = map(localPulseWidth, PWM_MIN, PWM_MAX, 0, MAX);
-  
   val = constrain(val, 0, MAX);
   
   // TODO: Possibly change integer division to floating division
@@ -204,7 +208,7 @@ void updateDropAndDoorServos(int localPulseWidth) {
   int newDoorWrite = DOOR_SERVO_START;
    
   // Open door if val > MAX / 4
-  if (val > MAX / 4) {
+  if (val > MAX / 4.0f) {
     newDoorWrite = 180;
   }
   
@@ -222,7 +226,16 @@ void updateDropAndDoorServos(int localPulseWidth) {
   int newReleaseWrite2 = 15;
   
   // Drop payloads as specified
-  if (val > MAX * 3 / 4) {
+  
+  if (val > MAX * 0.75f) {  
+    newReleaseWrite1 = 110;
+    newReleaseWrite2 = 110;
+
+    if (!dropped) {
+      ++numDropped;
+      dropped = true;
+    }
+  } else if (val > MAX * 0.5f) {
     newReleaseWrite1 = 160;
     newReleaseWrite2 = 180;
     
@@ -231,14 +244,6 @@ void updateDropAndDoorServos(int localPulseWidth) {
       dropped = true;
     }
     
-  } else if (val > MAX / 3) {
-    newReleaseWrite1 = 110;
-    newReleaseWrite2 = 110;
-    
-    if (numDropped < 2) {
-      ++numDropped;
-      dropped = true;
-    }
   }
   
   // Only write to servo if necessary to avoid jitter
