@@ -26,7 +26,7 @@ Data *data;
 volatile uint8_t numDropped = 0;
 
 // Hertz Rate for Data Collection
-const int hertz = 2;
+const int hertz = 5;
 const int delayTime = 1000 / hertz;
 
 const long debounceTime = 20000;
@@ -59,7 +59,7 @@ byte ledState = 0;
 bool dropped = false;
 
 const int DOOR_SERVO_START = 75;
-const int B_MSG_REPEAT_ATTEMPTS = 10;
+const int B_MSG_REPEAT_ATTEMPTS = 25;
 
 // XBee Setup
 
