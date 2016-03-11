@@ -228,16 +228,16 @@ void updateDropAndDoorServos(int localPulseWidth) {
   // Drop payloads as specified
   
   if (val > MAX * 0.75f) {  
-    newReleaseWrite1 = 110;
-    newReleaseWrite2 = 110;
+    newReleaseWrite1 = 160;
+    newReleaseWrite2 = 180;
 
     if (!dropped) {
       ++numDropped;
       dropped = true;
     }
   } else if (val > MAX * 0.5f) {
-    newReleaseWrite1 = 160;
-    newReleaseWrite2 = 180;
+    newReleaseWrite1 = 110;
+    newReleaseWrite2 = 110;
     
     if (numDropped < 1) {
       numDropped = 1;
