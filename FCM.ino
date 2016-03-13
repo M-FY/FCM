@@ -39,6 +39,8 @@ const int interruptPin = 3;
 volatile long lastTime = 0; 
 volatile long pulseWidth = 0;
 
+volatile bool doorOpen = false;
+
 Servo doorServo;
 const int doorServoPin = 9;
 
@@ -60,6 +62,7 @@ bool dropped = false;
 
 const int DOOR_SERVO_START = 75;
 const int B_MSG_REPEAT_ATTEMPTS = 25;
+const int RELEASE_SERVO_START = 15;
 
 // XBee Setup
 
@@ -81,10 +84,10 @@ void setup() {
   doorServo.write(DOOR_SERVO_START);
   
   releaseServo1.attach(releaseServo1Pin);
-  releaseServo1.write(0);
+  releaseServo1.write(180 - RELEASE_SERVO_START);
   
   releaseServo2.attach(releaseServo2Pin);
-  releaseServo2.write(0);
+  releaseServo2.write(RELEASE_SERVO_START);
   
   pinMode(ledPin, OUTPUT);
 
@@ -95,6 +98,7 @@ void setup() {
 }
 
 long lastLoopTime = 0;
+int lastAlt = 0;
 
 void loop() {
   data->update();
@@ -104,6 +108,7 @@ void loop() {
   
   bool localDropped = dropped;
   int localWidth = pulseWidth;
+  bool localDoorOpen = doorOpen;
   
   interrupts();
   
@@ -111,6 +116,11 @@ void loop() {
   // readings from the receiver  
   if (millis() > (long)1000)
     updateDropAndDoorServos(localWidth);
+
+
+  if (!localDoorOpen) {
+    lastAlt = data->getAltitude();
+  }
 
   // Blink LED and Write Data to Serial regularly
   if (millis() - lastLoopTime > delayTime) {
@@ -130,7 +140,7 @@ void writeDataB() {
   static char bBuffer[32];
   
   if (drop_repeat == 0 || num_dropped_old != numDropped) {
-    drop_alt = data->getAltitude();
+    drop_alt = lastAlt;
     drop_repeat = B_MSG_REPEAT_ATTEMPTS;
 
     num_dropped_old = numDropped;
@@ -168,7 +178,7 @@ void writeData() {
   String message = "A,M-Fly,";
   message += time;
   message += ',';
-  message += data->getAltitude();
+  message += lastAlt;
   message += ',';
   message += data->getGyroX();
   message += ',';
@@ -206,10 +216,13 @@ void updateDropAndDoorServos(int localPulseWidth) {
   
   static int doorWrite = DOOR_SERVO_START;
   int newDoorWrite = DOOR_SERVO_START;
+
+  doorOpen = false;
    
   // Open door if val > MAX / 4
   if (val > MAX / 4.0f) {
     newDoorWrite = 180;
+    doorOpen = true;
   }
   
   // Write to door servos
@@ -220,10 +233,10 @@ void updateDropAndDoorServos(int localPulseWidth) {
   
   // hold values to write to servo
   static int releaseWrite1 = 0;
-  int newReleaseWrite1 = 15;
+  int newReleaseWrite1 = RELEASE_SERVO_START;
 
   static int releaseWrite2 = 0;
-  int newReleaseWrite2 = 15;
+  int newReleaseWrite2 = RELEASE_SERVO_START;
   
   // Drop payloads as specified
   
@@ -243,7 +256,6 @@ void updateDropAndDoorServos(int localPulseWidth) {
       numDropped = 1;
       dropped = true;
     }
-    
   }
   
   // Only write to servo if necessary to avoid jitter
