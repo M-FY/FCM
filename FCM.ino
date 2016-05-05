@@ -145,6 +145,8 @@ void writeDataB() {
 
     num_dropped_old = numDropped;
 
+    // B,TIME,DROPPED,ALT,
+    
     String bMessage = "B,";
     bMessage += millis() / 1000.0f;
     bMessage += ',';
@@ -174,6 +176,8 @@ void writeData() {
   float batteryVoltage = readVcc() / 1000.0f;
   
   float time = millis() / 1000.0f;
+
+  // A,M-Fly,TIME,ALTITUDE,GYROX,GYROY,GYROZ,AIRSPEED,VOLTAGE,DROPPED,ACCELX,ACCELY,ACCELZ,
   
   String message = "A,M-Fly,";
   message += time;
