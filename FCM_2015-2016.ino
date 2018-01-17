@@ -127,9 +127,10 @@ void loop() {
     lastLoopTime = millis();
     ledState = !ledState;
     digitalWrite(ledPin, ledState);
-    
-    if (dropped) writeDataB();
-    else writeData();
+
+    writeDataA();
+    //writeDataC();
+
   }
 }
 
@@ -169,20 +170,51 @@ void writeDataB() {
   }
 }
 
-void writeData() {
+void writeDataA() {
+  static char csvBuffer[32];
+  
+  // Write telemetry to serial
+  float batteryVoltage = readVcc() / 1000.0f;
+  
+  // A,M,MILLIS,ALT_BARO,ANALOG_PITOT,PRESS,TEMP,DROP_TIME,DROP_ALT
+  
+  String message = "";
+  message += "A,M,";
+  message += millis();
+  message += ',';
+  message += data->getAltitude();
+  message += ',';
+  message += '0';
+  message += ',';
+  message += data->getPressure();
+  message += ',';
+  message += '0';
+  message += ',';
+  message += '0';
+  message += ',';
+  message += '0';
+  message += ';';
+  
+  message.toCharArray(csvBuffer, message.length()+1);
+  
+  ZBTxRequest zbtx = ZBTxRequest(broadcast, (uint8_t *) csvBuffer, strlen(csvBuffer));
+
+  //Serial.println(csvBuffer);
+
+  xbee.send(zbtx);
+}
+
+void writeDataC() {
   static char csvBuffer[64];
   
   // Write telemetry to serial
   float batteryVoltage = readVcc() / 1000.0f;
   
-  float time = millis() / 1000.0f;
-
-  // A,M-Fly,TIME,ALTITUDE,GYROX,GYROY,GYROZ,AIRSPEED,VOLTAGE,DROPPED,ACCELX,ACCELY,ACCELZ,
+  // C,MX2,MILLIS,GYROX,GYROY,GYROZ,ACCELX,ACCELY,ACCELZ
   
-  String message = "A,M-Fly,";
-  message += time;
-  message += ',';
-  message += lastAlt;
+  String message = "";
+  message += "C,M,";
+  message += millis();
   message += ',';
   message += data->getGyroX();
   message += ',';
@@ -190,22 +222,19 @@ void writeData() {
   message += ',';
   message += data->getGyroZ();
   message += ',';
-  message += random(10,40);
-  message += ',';
-  message += batteryVoltage;
-  message += ',';
-  message += numDropped;
-  message += ',';
   message += data->getAccelX();
   message += ',';
   message += data->getAccelY();
   message += ',';
   message += data->getAccelZ();
+  message += ';';
   
-  message.toCharArray(csvBuffer, message.length());
+  //message.toCharArray(csvBuffer, message.length());
   
-  ZBTxRequest zbtx = ZBTxRequest(broadcast, (uint8_t *) csvBuffer, strlen(csvBuffer));
-  xbee.send(zbtx);
+  //ZBTxRequest zbtx = ZBTxRequest(broadcast, (uint8_t *) csvBuffer, strlen(csvBuffer));
+  //xbee.send(zbtx);
+
+  //Serial.println(message);
 }
 
 void updateDropAndDoorServos(int localPulseWidth) {
